@@ -1,0 +1,352 @@
+
+/*
+ * File: Breakout.java
+ * -------------------
+ * Name:
+ * Section Leader:
+ * 
+ * This file will eventually implement the game of Breakout.
+ */
+
+import acm.graphics.*;
+import java.awt.color.*;
+import acm.program.*;
+import acm.util.*;
+
+import java.applet.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class Breakout extends GraphicsProgram {
+
+	private RandomGenerator rgen = RandomGenerator.getInstance();
+
+	/** Width and height of application window in pixels */
+	public static final int APPLICATION_WIDTH = 400;
+	public static final int APPLICATION_HEIGHT = 600;
+
+	/** Dimensions of game board (usually the same) */
+	private static final int WIDTH = APPLICATION_WIDTH;
+	private static final int HEIGHT = APPLICATION_HEIGHT;
+
+	/** Dimensions of the paddle */
+	private static final int PADDLE_WIDTH = 60;
+	private static final int PADDLE_HEIGHT = 10;
+
+	/** Offset of the paddle up from the bottom */
+	private static final int PADDLE_Y_OFFSET = 30;
+
+	/** Number of bricks per row */
+	private static final int NBRICKS_PER_ROW = 10;
+
+	/** Number of rows of bricks */
+	private static final int NBRICK_ROWS = 10;
+
+	/** Separation between bricks */
+	private static final int BRICK_SEP = 4;
+
+	/** Width of a brick */
+	private static final int BRICK_WIDTH = (WIDTH - (NBRICKS_PER_ROW - 1) * BRICK_SEP) / NBRICKS_PER_ROW;
+
+	/** Height of a brick */
+	private static final int BRICK_HEIGHT = 8;
+
+	/** Radius of the ball in pixels */
+	private static final int BALL_RADIUS = 10;
+
+	/** Offset of the top brick row from the top */
+	private static final int BRICK_Y_OFFSET = 70;
+
+	/** Number of bricks at the beginning of the game */
+	private int TOTAL_BRICKS = NBRICK_ROWS * NBRICKS_PER_ROW;
+
+	/** Number of turns */
+	private static final int NTURNS = 3;
+
+	private static final int DELAY = 15;
+
+	/** Initial number of games played in the beginning of every game */
+	private int GAMES_PLAYED = 0;
+
+	private GRect paddle;
+	private GOval ball;
+	private GLabel label;
+
+	/* Method: run() */
+	/** Runs the Breakout program. */
+	public void run() {
+		addMouseListeners();
+		setUp();
+		runGame();
+	}
+
+	/** initialization of the game */
+	private void setUp() {
+		drawBricks();
+		drawPaddle();
+		drawBall();
+	}
+
+	// Returns true if ball hits paddle
+	private boolean hitPaddle(double vx, double vy) {
+		return ball.getX() + 2 * BALL_RADIUS >= paddle.getX() && ball.getX() <= paddle.getX() + PADDLE_WIDTH
+				&& ball.getY() + 2 * BALL_RADIUS >= paddle.getY();
+	}
+
+	// Returns true if ball hits right wall
+	private boolean hitRightWall(double vx, double vy) {
+		return ball.getX() + 2 * BALL_RADIUS >= APPLICATION_WIDTH;
+	}
+
+	// Returns true if ball hits left wall
+	private boolean hitLeftWall(double vx, double vy) {
+		return ball.getX() <= 0;
+	}
+
+	// Returns true if ball hits top of the window
+	private boolean hitTop(double vx, double vy) {
+		return ball.getY() <= 0;
+	}
+
+	// Returns true if ball hits bottom of the window
+	private boolean hitBottom(double vx, double vy) {
+		return ball.getY() + 2 * BALL_RADIUS >= APPLICATION_HEIGHT;
+	}
+
+	/** This method checks if there is an object at coordinates of 4 corners of
+	/* square where ball is drawn
+	 */
+	private GObject getCollidingObject() {
+		if (getElementAt(ball.getX(), ball.getY()) != null) {
+			return getElementAt(ball.getX(), ball.getY());
+		} else {
+			if (getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY()) != null) {
+				return getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY());
+			} else {
+				if (getElementAt(ball.getX(), ball.getY() + 2 * BALL_RADIUS) != null) {
+					return getElementAt(ball.getX(), ball.getY() + 2 * BALL_RADIUS);
+				} else {
+					if (getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY() + 2 * BALL_RADIUS) != null) {
+						return getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY() + 2 * BALL_RADIUS);
+					} else {
+						return null;
+					}
+				}
+			}
+		}
+	}
+
+	private void runGame() {
+		label = new GLabel ("Click To Start");
+		label.setLocation(getWidth() / 2 - label.getWidth() / 2, getHeight() / 2 - 50);
+		add(label);		
+		waitForClick(); // game starts after mouse click
+		remove(label); // after mouse click text disappears
+		moveBall();
+	}
+
+	private void moveBall() {
+		double vx = rgen.nextDouble(1.0, 3.0); // ball starts moving at random velocity between 1 and 3
+		if (rgen.nextBoolean(0.5)) vx = -vx;
+		double vy = +3.0;
+
+		while (true) {
+			ball.move(vx, vy);
+			pause(DELAY);
+			
+			// Hitting objects and edges of window changes direction of the ball
+			hitEdges(vx, vy);
+			if (GAMES_PLAYED == 3) break;
+
+			GObject collider = getCollidingObject();
+
+			// If ball hits bricks it changes direction and bricks disappear
+			if (collider != null && collider != paddle) {
+				hitBricks(vx, vy, collider);
+				if (TOTAL_BRICKS <= 0) break;
+			}
+		}
+	}
+	
+	private void hitEdges(double vx, double vy) {
+		
+		if (hitPaddle(vx, vy) || hitTop(vx, vy)) {
+			vy = -vy;
+			ball.move(vx, vy);
+			pause(DELAY);
+		}
+
+		if (hitRightWall(vx, vy) || hitLeftWall(vx, vy)) {
+			vx = -vx;
+			ball.move(vx, vy);
+			pause(DELAY);
+		}
+
+		if (hitBottom(vx, vy)) {
+			GAMES_PLAYED++;
+
+			// Ball hits bottom for the first time
+			if (GAMES_PLAYED == 1) {
+				label = new GLabel("Lives Left: 2");
+				label.setLocation(getWidth() / 2 - label.getWidth() / 2, getHeight() / 2 + label.getAscent() / 2);
+				add(label);
+				pause(2000);
+				remove(label);
+				drawBall();
+			}
+
+			// Ball hits bottom for the second time
+			if (GAMES_PLAYED == 2) {
+				label = new GLabel("Lives Left: 1");
+				label.setLocation(getWidth() / 2 - label.getWidth() / 2, getHeight() / 2 + label.getAscent() / 2);
+				add(label);
+				pause(2000);
+				remove(label);
+				drawBall();
+			}
+
+			// Ball hits bottom for the third time and game ends
+			if (GAMES_PLAYED == 3) {
+				label = new GLabel("YOU LOST");
+				label.setLocation(getWidth() / 2 - label.getWidth() / 2, getHeight() / 2 + label.getAscent() / 2);
+				add(label);
+			}
+		}
+	}
+	
+	private void hitBricks(double vx, double vy, GObject collider) {
+
+		// Ball hits brick on right or left sides
+		if (ball.getX() + 2 * BALL_RADIUS <= collider.getX() || ball.getX() >= collider.getX() + BRICK_WIDTH) {
+			vx = -vx;
+			ball.move(vx, vy);
+			pause(DELAY);
+			remove(collider);
+			TOTAL_BRICKS--;
+		} else {
+			// Ball hits brick on top or bottom
+			vy = -vy;
+			ball.move(vx, vy);
+			pause(DELAY);
+			remove(collider);
+			TOTAL_BRICKS--;
+		}
+
+		// Game ends when all bricks disappear
+		if (TOTAL_BRICKS <= 0) {
+			label = new GLabel("YOU WON!");
+			label.setLocation(getWidth() / 2 - label.getWidth() / 2, getHeight() / 2 + label.getAscent() / 2);
+			add(label);
+		}
+	}
+
+	// Draws black ball in the centre of the window
+	private void drawBall() {
+		int x = getWidth() / 2 - BALL_RADIUS;
+		int y = getHeight() / 2 - BALL_RADIUS;
+
+		ball = new GOval(2 * BALL_RADIUS, 2 * BALL_RADIUS);
+		ball.setFilled(true);
+		ball.setFillColor(Color.BLACK);
+		add(ball, x, y);
+	}
+
+	// Draws black paddle
+	private void drawPaddle() {
+		int x = (getWidth() - PADDLE_WIDTH) / 2; // in the centre
+		int y = getHeight() - PADDLE_Y_OFFSET - PADDLE_HEIGHT;
+
+		paddle = new GRect(PADDLE_WIDTH, PADDLE_HEIGHT);
+		paddle.setFilled(true);
+		paddle.setFillColor(Color.BLACK);
+		add(paddle, x, y);
+	}
+
+	// Moves paddle horizontally with mouse
+	public void mouseMoved(MouseEvent e) {
+		if (e.getX() + PADDLE_WIDTH / 2 < APPLICATION_WIDTH && e.getX() - PADDLE_WIDTH / 2 > 0) {
+			int x = e.getX() - PADDLE_WIDTH / 2;
+			int y = getHeight() - PADDLE_Y_OFFSET - PADDLE_HEIGHT;
+			paddle.setLocation(x, y);
+		}
+	}
+
+	private void drawBricks() {
+		drawRows();
+	}
+
+	private void drawRows() {
+		for (int rowNums = 0; rowNums < NBRICK_ROWS; rowNums++) {
+			drawNBricks(rowNums);
+		}
+	}
+
+	private void drawNBricks(int rowNums) {
+
+		for (int brickNums = 0; brickNums < NBRICKS_PER_ROW; brickNums++) {
+			int x = getWidth() / 2 - (BRICK_WIDTH * NBRICKS_PER_ROW + BRICK_SEP * (NBRICKS_PER_ROW - 1)) / 2
+					+ brickNums * (BRICK_WIDTH + BRICK_SEP);
+			int y = BRICK_Y_OFFSET + rowNums * (BRICK_HEIGHT + BRICK_SEP);
+
+			GRect brick = new GRect(BRICK_WIDTH, BRICK_HEIGHT);
+			add(brick, x, y);
+			switch (rowNums) {
+			// Sets color to first and second rows of bricks to red
+			case 0:
+				brick.setColor(Color.RED);
+				brick.setFilled(true);
+				brick.setFillColor(Color.RED);
+				break;
+			case 1:
+				brick.setColor(Color.RED);
+				brick.setFilled(true);
+				brick.setFillColor(Color.RED);
+				break;
+			// Sets color to third and fourth rows of bricks to orange
+			case 2:
+				brick.setColor(Color.ORANGE);
+				brick.setFilled(true);
+				brick.setFillColor(Color.ORANGE);
+				break;
+			case 3:
+				brick.setColor(Color.ORANGE);
+				brick.setFilled(true);
+				brick.setFillColor(Color.ORANGE);
+				break;
+			// Sets color to fifth and sixth rows of bricks to yellow
+			case 4:
+				brick.setColor(Color.YELLOW);
+				brick.setFilled(true);
+				brick.setFillColor(Color.YELLOW);
+				break;
+			case 5:
+				brick.setColor(Color.YELLOW);
+				brick.setFilled(true);
+				brick.setFillColor(Color.YELLOW);
+				break;
+			// Sets color to seventh and eighth rows of bricks to green
+			case 6:
+				brick.setColor(Color.GREEN);
+				brick.setFilled(true);
+				brick.setFillColor(Color.GREEN);
+				break;
+			case 7:
+				brick.setColor(Color.GREEN);
+				brick.setFilled(true);
+				brick.setFillColor(Color.GREEN);
+				break;
+			// Sets color to ninth and tenth rows of bricks to cyan
+			case 8:
+				brick.setColor(Color.CYAN);
+				brick.setFilled(true);
+				brick.setFillColor(Color.CYAN);
+				break;
+			case 9:
+				brick.setColor(Color.CYAN);
+				brick.setFilled(true);
+				brick.setFillColor(Color.CYAN);
+				break;
+			}
+		}
+	}
+}
